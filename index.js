@@ -11,6 +11,7 @@ const config = require('./config.json')
 
 client.on('ready', () => {
     console.log('Online...')
+    client.user.setActivity('https://github.com/SDeVuyst/WhereContextBot');
 });
 
 client.on('message', msg => {
