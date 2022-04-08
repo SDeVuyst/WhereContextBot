@@ -6,15 +6,13 @@ const client = new Discord.Client({intents: ["GUILDS", "GUILD_MESSAGES", "GUILD_
 const config = require('./config.json')
 
 
-// TODO loop review
-
 
 client.on('ready', () => {
     console.log('Online...')
-    client.user.setActivity('https://github.com/SDeVuyst/WhereContextBot');
+    client.user.setActivity('github.com/SDeVuyst/WhereContextBot');
 });
 
-client.on('message', msg => {
+client.on('messageCreate', msg => {
     
     if (msg.author.bot) return;
 
@@ -22,7 +20,7 @@ client.on('message', msg => {
 
     // User mentions bot, add original message to contexts
     if (msg.type == 'REPLY' && msg.content == '<@!960541616907649114>') {
-
+        console.log("detected reply")
         channel.messages.fetch(Object.values(msg.reference)[2])
         .then (message => {
             msg.reply("Added.")
@@ -42,14 +40,18 @@ client.on('message', msg => {
         if (command == "lets play") {
             // msg.reply('work in progress');
             outOfContextGame(channel, msg.author);
-            msg.delete()
+            if (!msg.deleted) {
+                msg.delete()
+            }
             return;
 
         // review the previous message to add to contexts or not
         } else if (command == "review") { 
             
             reviewMessage(channel, msg.author);
-            msg.delete()
+            if (!msg.deleted) {
+                msg.delete()
+            }
             return;
 
         } else if (command == "help" || command == "info") {
@@ -68,20 +70,25 @@ client.on('message', msg => {
             .setThumbnail(msg.author.avatarURL({ dynamic:true }))
 
             channel.send({embeds: [helpEmbed]});
-
-            msg.delete()
+            if (!msg.deleted) {
+                msg.delete()
+            }
             return;
 
 
         } else if (command.includes('skip')) {
 
             const id = command.substring(5)
-            msg.reply(`last reviewed is now ${id}`);
-            updateLastID(id);
+            if (!isNaN(id)) {
+                msg.reply(`last reviewed is now ${id}`);
+                updateLastID(id);
+            } else {
+                msg.reply("invalid ID.")
+            }
             return;
 
         } else {
-            msg.reply("fuck u mean bro??");
+            msg.reply("fuck u mean bro?? use 'ayo help' for list of commands.");
         }
         return;
 
@@ -104,10 +111,11 @@ async function outOfContextGame (channel, requester) {
         let messageAttachment = message.attachments.size > 0 ? Object.values(message.attachments.first())[4] : null
         const gameEmbed = new MessageEmbed()
             .setTitle('Out of context game')
+            .setColor('#0099ff')
             .setURL(message.url)
             .setDescription(message.cleanContent)
             .setThumbnail(message.author.avatarURL({ dynamic:true }))
-            .setFooter("Click ❌ to remove this embed")
+            .setFooter({ text: "Click ❌ to remove this embed"})
             if (messageAttachment) gameEmbed.setImage(messageAttachment)
 
         channel.send({embeds: [gameEmbed]}).then(sentEmbed => {
@@ -121,7 +129,7 @@ async function outOfContextGame (channel, requester) {
             sentEmbed.awaitReactions({ filter, max: 1, time: 16000, errors: ['time'] })
             .then(collected => {
                 const reaction = collected.first();
-                if (reaction.emoji.name === '❌') {
+                if (reaction.emoji.name === '❌' && !sentEmbed.deleted) {
                     sentEmbed.delete();
                 }
             })
@@ -147,6 +155,11 @@ async function reviewMessage (channel, requester) {
             if (reviewMessage.content.includes('"')) {
                 addToContexts(reviewMessage);
                 config.lastID = reviewMessage.id;
+                const reviewEmbed = new MessageEmbed()
+                    .setTitle("Auto-Added message.")
+                    .setColor('#0099ff')
+
+                channel.send({embeds: [reviewEmbed]});
                 return;
             } 
 
@@ -154,10 +167,11 @@ async function reviewMessage (channel, requester) {
             let messageAttachment = reviewMessage.attachments.size > 0 ? Object.values(reviewMessage.attachments.first())[4] : null;
             const reviewEmbed = new MessageEmbed()
                 .setTitle(`Review Quote by ${reviewMessage.author.username}`)
+                .setColor('#0099ff')
                 .setURL(reviewMessage.url)
                 .setDescription(reviewMessage.content)
                 .setThumbnail(reviewMessage.author.avatarURL({ dynamic:true }))
-                .setFooter("Click 👍 to add, click 👎 to skip")
+                .setFooter({ text: "Click 👍 to add, click 👎 to skip"})
 
                 if (messageAttachment) reviewEmbed.setImage(messageAttachment)
 
@@ -182,49 +196,73 @@ async function reviewMessage (channel, requester) {
                         // create new embed using original as starter
                         const newReviewEmbed = new MessageEmbed()
                             .setTitle('Added.')
+                            .setColor('#0099ff')
                             .setURL(reviewMessage.url)
                             .setDescription(reviewMessage.content)
                             .setThumbnail(reviewMessage.author.avatarURL({ dynamic:true }))
                             if (messageAttachment) reviewEmbed.setImage(messageAttachment)
-                        sentEmbed.edit({embeds: [newReviewEmbed]});
+                        if (!sentEmbed.deleted) {
+                            sentEmbed.edit({embeds: [newReviewEmbed]});
+                            // change last ID
+                            updateLastID(reviewMessage.id);
+                            console.log(`added ${reviewMessage.id}`);
+                        } else {
+                            console.log("message already deleted.");
+                        }
 
-                        // change last ID
-                        updateLastID(reviewMessage.id);
-                        console.log(`added ${reviewMessage.id}`)
-                        // delete Embed
-                        setTimeout(function () {
-                            sentEmbed.delete()
-                        }, 1750)
+                        sleep(1250).then(() => {
+                            // delete Embed
+                            if (!sentEmbed.deleted) {
+                                sentEmbed.delete();
+                            } else {
+                                console.log("message already deleted.");
+                            }
+                        })
+                        .catch(console.error);
+                        
 
                     } else {
                         
                         // User does not approve, skip message
                         const newReviewEmbed = new MessageEmbed()
                             .setTitle('Did not add.')
+                            .setColor('#0099ff')
                             .setURL(reviewMessage.url)
                             .setDescription(reviewMessage.content)
                             .setThumbnail(reviewMessage.author.avatarURL({ dynamic:true }))
                             if (messageAttachment) reviewEmbed.setImage(messageAttachment)
-                        sentEmbed.edit({embeds: [newReviewEmbed]});
 
-                        // change last ID
-                        updateLastID(reviewMessage.id);
-                        console.log(`did not add ${reviewMessage.id}`)
-
-                        // delete Embed
-                        setTimeout(function () {
-                            sentEmbed.delete()
-                        }, 1250)
+                        if (!sentEmbed.deleted) {
+                            sentEmbed.edit({embeds: [newReviewEmbed]});
+                            // change last ID
+                            updateLastID(reviewMessage.id);
+                            console.log(`did not add ${reviewMessage.id}`)
+                        } else {
+                            console.log("message already deleted.");
+                        }
+                        
+                        sleep(1250).then(() => {
+                            if (!sentEmbed.deleted) {
+                                // delete Embed
+                                sentEmbed.delete()
+                            } else {
+                                console.log("message already deleted.");
+                            }
+                        })
+                        .catch(console.error);       
                     }
                 })
                 .catch(collected => {
-                    const temp = sentEmbed.reply('You reacted with neither a thumbs up, nor a thumbs down.');
                     console.log("No response...")
                     // delete Embed
-                    setTimeout(function () {
-                        sentEmbed.delete()
-
-                    }, 1250)
+                    if (!sentEmbed.deleted) {
+                        sentEmbed.reply('You reacted with neither a thumbs up, nor a thumbs down.');
+                        setTimeout(function () {
+                                sentEmbed.delete();
+                        }, 1250)
+                    } else {
+                        console.log("message already deleted.");
+                    }
                 });
             });
 
@@ -276,5 +314,10 @@ function updateLastID (newID) {
     return;
 };
 
+function sleep(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
 
 client.login(config.token);
