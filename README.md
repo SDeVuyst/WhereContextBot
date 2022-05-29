@@ -5,4 +5,4 @@
 * fix calls from *lets play* so that it uses the id instead of full message from JSON
 * add more random modifier (saves last x messages so those don't get reused multiple times)
 * quiz?
-* reaction images on request eg. damn bro you got the whole squad laughing
+* reaction images on request eg. damn bro you got the whole squad laughing, sike u thought etc.
